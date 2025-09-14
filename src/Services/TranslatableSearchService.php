@@ -28,7 +28,7 @@ class TranslatableSearchService
         array $options = []
     ): Collection {
         if (empty($search)) {
-            return new Collection();
+            return new Collection;
         }
 
         $query = $this->buildSearchQuery($modelClass, $search, $options);
@@ -54,10 +54,12 @@ class TranslatableSearchService
         return $results->mapWithKeys(function ($model) use ($labelField, $formatter) {
             if ($formatter && is_callable($formatter)) {
                 $formatted = $formatter($model);
+
                 return is_array($formatted) ? $formatted : [$model->id => $formatted];
             }
 
             $label = $this->getTranslatedLabel($model, $labelField);
+
             return [$model->id => $label];
         })->toArray();
     }
@@ -72,6 +74,7 @@ class TranslatableSearchService
         // Check if the field is translatable and the model has the HasTranslations trait
         if ($this->isFieldTranslatable($model, $field) && $this->hasTranslationsSupport($model)) {
             $translation = $model->getTranslation($field, $locale);
+
             return $translation ?: ($model->$field ?? '');
         }
 
@@ -86,7 +89,7 @@ class TranslatableSearchService
     {
         $model = new $modelClass;
 
-        if (!$this->hasTranslationsSupport($model)) {
+        if (! $this->hasTranslationsSupport($model)) {
             return [];
         }
 
@@ -137,7 +140,7 @@ class TranslatableSearchService
 
         return $query->where(function (Builder $subQuery) use ($search, $translatableFields, $nonTranslatableFields, $locales) {
             // Search in translatable fields across all locales
-            if (!empty($translatableFields)) {
+            if (! empty($translatableFields)) {
                 foreach ($translatableFields as $field) {
                     foreach ($locales as $locale) {
                         $this->addTranslatableFieldCondition($subQuery, $field, $locale, $search);

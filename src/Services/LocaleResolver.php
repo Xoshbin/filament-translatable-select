@@ -75,25 +75,27 @@ class LocaleResolver
 
             case 'filament':
                 $locales = $this->getLocalesFromFilamentPlugin();
-                return !empty($locales) ? $locales : ['en'];
+
+                return ! empty($locales) ? $locales : ['en'];
 
             case 'config':
                 $locales = $this->getLocalesFromAppConfig();
-                return !empty($locales) ? $locales : ['en'];
+
+                return ! empty($locales) ? $locales : ['en'];
 
             case 'auto':
             default:
                 // Try to get locales from Filament Spatie Translatable plugin
                 $locales = $this->getLocalesFromFilamentPlugin();
 
-                if (!empty($locales)) {
+                if (! empty($locales)) {
                     return $locales;
                 }
 
                 // Fallback to application configuration
                 $locales = $this->getLocalesFromAppConfig();
 
-                if (!empty($locales)) {
+                if (! empty($locales)) {
                     return $locales;
                 }
 
@@ -111,7 +113,7 @@ class LocaleResolver
             // Get the current panel
             $panel = Filament::getCurrentPanel();
 
-            if (!$panel) {
+            if (! $panel) {
                 return [];
             }
 
@@ -122,7 +124,7 @@ class LocaleResolver
                 if ($plugin instanceof SpatieTranslatablePlugin) {
                     $locales = $plugin->getDefaultLocales();
 
-                    if (is_array($locales) && !empty($locales)) {
+                    if (is_array($locales) && ! empty($locales)) {
                         return $locales;
                     }
                 }
@@ -150,7 +152,7 @@ class LocaleResolver
         foreach ($configKeys as $key) {
             $locales = config($key);
 
-            if (is_array($locales) && !empty($locales)) {
+            if (is_array($locales) && ! empty($locales)) {
                 return $locales;
             }
         }
