@@ -14,12 +14,13 @@ use Xoshbin\TranslatableSelect\Tests\TestCase;
 class TranslatableSearchServiceTest extends TestCase
 {
     private TranslatableSearchService $searchService;
+
     private LocaleResolver $localeResolver;
 
     protected function setUp(): void
     {
         parent::setUp();
-        $this->localeResolver = new LocaleResolver();
+        $this->localeResolver = new LocaleResolver;
         $this->searchService = new TranslatableSearchService($this->localeResolver);
     }
 
@@ -70,7 +71,7 @@ class TranslatableSearchServiceTest extends TestCase
     public function test_gets_translated_label_current_locale(): void
     {
         App::setLocale('ku');
-        
+
         $category = CategoryFactory::new()->withSpecificTranslations([
             'en' => 'Technology',
             'ku' => 'تەکنەلۆژیا',
@@ -85,7 +86,7 @@ class TranslatableSearchServiceTest extends TestCase
     public function test_gets_translated_label_fallback_locale(): void
     {
         App::setLocale('fr'); // Not available in translations
-        
+
         $category = CategoryFactory::new()->withSpecificTranslations([
             'en' => 'Technology',
             'ku' => 'تەکنەلۆژیا',
@@ -100,7 +101,7 @@ class TranslatableSearchServiceTest extends TestCase
     public function test_gets_translated_label_with_preferred_locale(): void
     {
         App::setLocale('en');
-        
+
         $category = CategoryFactory::new()->withSpecificTranslations([
             'en' => 'Technology',
             'ku' => 'تەکنەلۆژیا',
@@ -209,7 +210,7 @@ class TranslatableSearchServiceTest extends TestCase
             'Technology',
             ['name'],
             ['en', 'ku', 'ar'],
-            fn($query) => $query->where('active', true)
+            fn ($query) => $query->where('active', true)
         );
 
         $this->assertCount(1, $results);
@@ -218,8 +219,10 @@ class TranslatableSearchServiceTest extends TestCase
 
     public function test_handles_non_translatable_model(): void
     {
-        $nonTranslatableModel = new class extends \Illuminate\Database\Eloquent\Model {
+        $nonTranslatableModel = new class extends \Illuminate\Database\Eloquent\Model
+        {
             protected $table = 'categories';
+
             protected $fillable = ['name'];
         };
 

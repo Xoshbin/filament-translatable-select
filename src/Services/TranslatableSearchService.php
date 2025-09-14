@@ -8,7 +8,6 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection as SupportCollection;
-use Illuminate\Support\Facades\DB;
 
 /**
  * Service for handling cross-locale search functionality.
@@ -196,7 +195,7 @@ class TranslatableSearchService
     /**
      * Get multiple translated labels efficiently.
      */
-    public function getTranslatedLabels(Collection|SupportCollection $models, string $field, ?string $preferredLocale = null): array
+    public function getTranslatedLabels(Collection | SupportCollection $models, string $field, ?string $preferredLocale = null): array
     {
         return $models->mapWithKeys(function (Model $model) use ($field, $preferredLocale) {
             return [$model->getKey() => $this->getTranslatedLabel($model, $field, $preferredLocale)];
