@@ -2,10 +2,10 @@
 
 namespace Xoshbin\TranslatableSelect\Components;
 
-use Xoshbin\TranslatableSelect\Services\TranslatableSearchService;
 use Filament\Forms\Components\Select;
 use Illuminate\Database\Eloquent\Model;
 use InvalidArgumentException;
+use Xoshbin\TranslatableSelect\Services\TranslatableSearchService;
 
 /**
  * A Filament Select component with built-in translatable search functionality.
@@ -17,11 +17,17 @@ use InvalidArgumentException;
 class TranslatableSelect extends Select
 {
     protected string $modelClass;
+
     protected array $searchFields = [];
+
     protected $formatter = null;
+
     protected string $labelField;
+
     protected int $searchLimit;
+
     protected bool $isPreloadEnabled = false;
+
     protected $queryModifier = null;
 
     /**
@@ -47,11 +53,11 @@ class TranslatableSelect extends Select
      */
     public function modelClass(string $modelClass): static
     {
-        if (!class_exists($modelClass)) {
+        if (! class_exists($modelClass)) {
             throw new InvalidArgumentException("Model class {$modelClass} does not exist.");
         }
 
-        if (!is_subclass_of($modelClass, Model::class)) {
+        if (! is_subclass_of($modelClass, Model::class)) {
             throw new InvalidArgumentException("Class {$modelClass} must extend Illuminate\\Database\\Eloquent\\Model.");
         }
 
@@ -107,7 +113,7 @@ class TranslatableSelect extends Select
     /**
      * Enable preloading of options.
      */
-    public function preload(\Closure|bool $condition = true): static
+    public function preload(\Closure | bool $condition = true): static
     {
         $this->isPreloadEnabled = is_bool($condition) ? $condition : true;
 
@@ -133,7 +139,7 @@ class TranslatableSelect extends Select
             $service = app(TranslatableSearchService::class);
 
             $options = [
-                'searchFields' => !empty($this->searchFields) ? $this->searchFields : null,
+                'searchFields' => ! empty($this->searchFields) ? $this->searchFields : null,
                 'labelField' => $this->labelField,
                 'formatter' => $this->formatter,
                 'limit' => $this->searchLimit,
@@ -151,10 +157,12 @@ class TranslatableSelect extends Select
                 return $filteredResults->mapWithKeys(function ($model) use ($service) {
                     if ($this->formatter) {
                         $formatted = ($this->formatter)($model);
+
                         return is_array($formatted) ? $formatted : [$model->id => $formatted];
                     }
 
                     $label = $service->getTranslatedLabel($model, $this->labelField);
+
                     return [$model->id => $label];
                 })->toArray();
             }
@@ -170,7 +178,7 @@ class TranslatableSelect extends Select
     {
         // Set up options - load actual options if preload is enabled
         $this->options(function (): array {
-            if (!$this->isPreloadEnabled) {
+            if (! $this->isPreloadEnabled) {
                 // Return empty array for search-only behavior
                 return [];
             }
@@ -192,10 +200,12 @@ class TranslatableSelect extends Select
             return $models->mapWithKeys(function ($model) use ($service) {
                 if ($this->formatter) {
                     $formatted = ($this->formatter)($model);
+
                     return is_array($formatted) ? $formatted : [$model->id => $formatted];
                 }
 
                 $label = $service->getTranslatedLabel($model, $this->labelField);
+
                 return [$model->id => $label];
             })->toArray();
         });
@@ -207,21 +217,21 @@ class TranslatableSelect extends Select
 
             $model = $this->modelClass::find($value);
 
-            if (!$model) {
+            if (! $model) {
                 return null;
             }
 
             if ($this->formatter) {
                 $formatted = ($this->formatter)($model);
+
                 return is_array($formatted) ? $formatted[$model->id] ?? null : $formatted;
             }
 
             $service = app(TranslatableSearchService::class);
+
             return $service->getTranslatedLabel($model, $this->labelField);
         });
     }
-
-
 
     /**
      * Create a select with a custom query modifier.
@@ -236,8 +246,6 @@ class TranslatableSelect extends Select
 
         return $this;
     }
-
-
 
     /**
      * Get the model class.

@@ -2,12 +2,12 @@
 
 namespace Xoshbin\TranslatableSelect\Concerns;
 
-use Xoshbin\TranslatableSelect\Services\TranslatableSearchService;
 use Xoshbin\TranslatableSelect\Services\LocaleResolver;
+use Xoshbin\TranslatableSelect\Services\TranslatableSearchService;
 
 /**
  * Trait for models that want to provide translatable search functionality.
- * 
+ *
  * This trait provides a clean interface for models to integrate with
  * the new translatable search system while maintaining backward compatibility.
  */
@@ -33,7 +33,7 @@ trait HasTranslatableSearch
 
     /**
      * Get search results for Filament select components.
-     * 
+     *
      * @deprecated Use TranslatableSelect component instead
      */
     public static function getFilamentSearchResults(
@@ -43,7 +43,7 @@ trait HasTranslatableSearch
         ?array $searchFields = null
     ): array {
         $service = app(TranslatableSearchService::class);
-        
+
         $options = [
             'searchFields' => $searchFields,
             'labelField' => $labelField ?? 'name',
@@ -55,7 +55,7 @@ trait HasTranslatableSearch
 
     /**
      * Get formatted search results with additional context.
-     * 
+     *
      * @deprecated Use TranslatableSelect component with formatter instead
      */
     public static function getFormattedSearchResults(
@@ -65,7 +65,7 @@ trait HasTranslatableSearch
         ?array $searchFields = null
     ): array {
         $service = app(TranslatableSearchService::class);
-        
+
         $options = [
             'searchFields' => $searchFields,
             'formatter' => $formatter,
@@ -77,7 +77,7 @@ trait HasTranslatableSearch
 
     /**
      * Search for models and return a collection with translated labels.
-     * 
+     *
      * @deprecated Use TranslatableSearchService directly
      */
     public static function searchWithTranslatedLabels(
@@ -86,7 +86,7 @@ trait HasTranslatableSearch
         ?array $searchFields = null
     ): \Illuminate\Database\Eloquent\Collection {
         $service = app(TranslatableSearchService::class);
-        
+
         $options = [
             'searchFields' => $searchFields,
             'limit' => $limit,
@@ -96,13 +96,14 @@ trait HasTranslatableSearch
 
         return $results->map(function ($model) use ($service) {
             $model->setAttribute('translated_label', $service->getTranslatedLabel($model, 'name'));
+
             return $model;
         });
     }
 
     /**
      * Scope to search across all translation locales for translatable fields.
-     * 
+     *
      * @deprecated Use TranslatableSearchService directly
      */
     public function scopeSearchTranslatable(\Illuminate\Database\Eloquent\Builder $query, string $search, ?array $fields = null): \Illuminate\Database\Eloquent\Builder
@@ -112,13 +113,13 @@ trait HasTranslatableSearch
         }
 
         $service = app(TranslatableSearchService::class);
-        
+
         $options = [
             'searchFields' => $fields,
         ];
 
         $results = $service->search(static::class, $search, $options);
-        
+
         return $query->whereIn('id', $results->pluck('id'));
     }
 
@@ -128,6 +129,7 @@ trait HasTranslatableSearch
     public function getTranslatedLabel(string $field, ?string $locale = null): string
     {
         $service = app(TranslatableSearchService::class);
+
         return $service->getTranslatedLabel($this, $field, $locale);
     }
 
@@ -138,8 +140,8 @@ trait HasTranslatableSearch
     {
         $service = app(TranslatableSearchService::class);
         $localeResolver = app(LocaleResolver::class);
-        
-        if (!in_array($field, $this->translatable ?? [])) {
+
+        if (! in_array($field, $this->translatable ?? [])) {
             return [$field => $this->$field];
         }
 
