@@ -1,10 +1,14 @@
 {
     "name": "xoshbin/translatable-select",
-    "description": "This is my package translatable-select",
+    "description": "A Filament Select component with built-in translatable search functionality for Laravel applications using Spatie Laravel Translatable",
     "keywords": [
-        "Xoshbin",
+        "filament",
         "laravel",
-        "translatable-select"
+        "translatable",
+        "select",
+        "search",
+        "spatie",
+        "multi-locale"
     ],
     "homepage": "https://github.com/xoshbin/translatable-select",
     "support": {
@@ -21,7 +25,12 @@
     ],
     "require": {
         "php": "^8.1",
-        "filament/forms": "^3.0",
+        "illuminate/contracts": "^10.0|^11.0|^12.0",
+        "illuminate/database": "^10.0|^11.0|^12.0",
+        "illuminate/support": "^10.0|^11.0|^12.0",
+        "filament/filament": "^3.0|^4.0",
+        "spatie/laravel-translatable": "^6.0",
+        "lara-zeus/spatie-translatable": "^1.0",
         "spatie/laravel-package-tools": "^1.15.0"
     },
     "require-dev": {

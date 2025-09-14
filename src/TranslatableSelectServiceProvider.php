@@ -14,6 +14,8 @@ use Spatie\LaravelPackageTools\Commands\InstallCommand;
 use Spatie\LaravelPackageTools\Package;
 use Spatie\LaravelPackageTools\PackageServiceProvider;
 use Xoshbin\TranslatableSelect\Commands\TranslatableSelectCommand;
+use Xoshbin\TranslatableSelect\Services\LocaleResolver;
+use Xoshbin\TranslatableSelect\Services\TranslatableSearchService;
 use Xoshbin\TranslatableSelect\Testing\TestsTranslatableSelect;
 
 class TranslatableSelectServiceProvider extends PackageServiceProvider
@@ -30,12 +32,11 @@ class TranslatableSelectServiceProvider extends PackageServiceProvider
          * More info: https://github.com/spatie/laravel-package-tools
          */
         $package->name(static::$name)
+            ->hasConfigFile()
             ->hasCommands($this->getCommands())
             ->hasInstallCommand(function (InstallCommand $command) {
                 $command
                     ->publishConfigFile()
-                    ->publishMigrations()
-                    ->askToRunMigrations()
                     ->askToStarRepoOnGitHub('xoshbin/translatable-select');
             });
 
@@ -45,9 +46,7 @@ class TranslatableSelectServiceProvider extends PackageServiceProvider
             $package->hasConfigFile();
         }
 
-        if (file_exists($package->basePath('/../database/migrations'))) {
-            $package->hasMigrations($this->getMigrations());
-        }
+
 
         if (file_exists($package->basePath('/../resources/lang'))) {
             $package->hasTranslations();
@@ -58,33 +57,17 @@ class TranslatableSelectServiceProvider extends PackageServiceProvider
         }
     }
 
-    public function packageRegistered(): void {}
+    public function packageRegistered(): void
+    {
+        // Register services
+        $this->app->singleton(LocaleResolver::class);
+        $this->app->singleton(TranslatableSearchService::class, function ($app) {
+            return new TranslatableSearchService($app->make(LocaleResolver::class));
+        });
+    }
 
     public function packageBooted(): void
     {
-        // Asset Registration
-        FilamentAsset::register(
-            $this->getAssets(),
-            $this->getAssetPackageName()
-        );
-
-        FilamentAsset::registerScriptData(
-            $this->getScriptData(),
-            $this->getAssetPackageName()
-        );
-
-        // Icon Registration
-        FilamentIcon::register($this->getIcons());
-
-        // Handle Stubs
-        if (app()->runningInConsole()) {
-            foreach (app(Filesystem::class)->files(__DIR__ . '/../stubs/') as $file) {
-                $this->publishes([
-                    $file->getRealPath() => base_path("stubs/translatable-select/{$file->getFilename()}"),
-                ], 'translatable-select-stubs');
-            }
-        }
-
         // Testing
         Testable::mixin(new TestsTranslatableSelect);
     }
@@ -140,13 +123,5 @@ class TranslatableSelectServiceProvider extends PackageServiceProvider
         return [];
     }
 
-    /**
-     * @return array<string>
-     */
-    protected function getMigrations(): array
-    {
-        return [
-            'create_translatable-select_table',
-        ];
-    }
+
 }
