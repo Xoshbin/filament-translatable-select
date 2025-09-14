@@ -1,172 +1,144 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Xoshbin\TranslatableSelect\Services;
 
-use Filament\Facades\Filament;
-use LaraZeus\SpatieTranslatable\SpatieTranslatablePlugin;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\App;
+use Illuminate\Support\Facades\Config;
+use Spatie\Translatable\HasTranslations;
 
 /**
- * Service for resolving available locales dynamically from various sources.
- *
- * This service provides a centralized way to determine which locales are available
- * for translatable search functionality, with fallback mechanisms to ensure
- * the system works in various configurations.
+ * Service for resolving locales for translatable models and application.
  */
 class LocaleResolver
 {
-    /**
-     * Cache for resolved locales to avoid repeated lookups.
-     */
-    private ?array $cachedLocales = null;
-
-    /**
-     * Get the available locales for translation search.
-     *
-     * Priority order:
-     * 1. Filament Spatie Translatable plugin configuration
-     * 2. Application locale configuration
-     * 3. Default fallback to English
-     */
-    public function getAvailableLocales(): array
-    {
-        if ($this->cachedLocales !== null) {
-            return $this->cachedLocales;
-        }
-
-        $this->cachedLocales = $this->resolveLocales();
-
-        return $this->cachedLocales;
-    }
-
     /**
      * Get the current application locale.
      */
     public function getCurrentLocale(): string
     {
-        return app()->getLocale();
+        return App::getLocale();
     }
 
     /**
-     * Check if a locale is supported.
+     * Get the fallback locale for the application.
      */
-    public function isLocaleSupported(string $locale): bool
+    public function getFallbackLocale(): string
     {
-        return in_array($locale, $this->getAvailableLocales(), true);
+        return Config::get('app.fallback_locale', 'en');
     }
 
     /**
-     * Clear the locale cache (useful for testing or dynamic configuration changes).
+     * Get all available locales for the application.
      */
-    public function clearCache(): void
+    public function getAvailableLocales(): array
     {
-        $this->cachedLocales = null;
-    }
-
-    /**
-     * Resolve locales from various sources with fallback mechanism.
-     */
-    private function resolveLocales(): array
-    {
-        $strategy = config('translatable-select.locale_strategy', 'auto');
-
-        switch ($strategy) {
-            case 'manual':
-                return config('translatable-select.manual_locales', ['en']);
-
-            case 'filament':
-                $locales = $this->getLocalesFromFilamentPlugin();
-
-                return ! empty($locales) ? $locales : ['en'];
-
-            case 'config':
-                $locales = $this->getLocalesFromAppConfig();
-
-                return ! empty($locales) ? $locales : ['en'];
-
-            case 'auto':
-            default:
-                // Try to get locales from Filament Spatie Translatable plugin
-                $locales = $this->getLocalesFromFilamentPlugin();
-
-                if (! empty($locales)) {
-                    return $locales;
-                }
-
-                // Fallback to application configuration
-                $locales = $this->getLocalesFromAppConfig();
-
-                if (! empty($locales)) {
-                    return $locales;
-                }
-
-                // Final fallback to default
-                return ['en'];
+        // Try to get from config first
+        $locales = Config::get('translatable-select.available_locales');
+        
+        if (! empty($locales)) {
+            return $locales;
         }
+
+        // Fallback to common configuration locations
+        $locales = Config::get('translatable.locales') 
+            ?? Config::get('app.available_locales')
+            ?? [$this->getCurrentLocale(), $this->getFallbackLocale()];
+
+        return array_unique($locales);
     }
 
     /**
-     * Get locales from Filament Spatie Translatable plugin.
+     * Get translatable locales for a specific model.
      */
-    private function getLocalesFromFilamentPlugin(): array
+    public function getModelLocales(string|Model $model): array
     {
-        try {
-            // Get the current panel
-            $panel = Filament::getCurrentPanel();
+        $modelClass = is_string($model) ? $model : get_class($model);
 
-            if (! $panel) {
-                return [];
-            }
+        if (! $this->isTranslatable($modelClass)) {
+            return [$this->getCurrentLocale()];
+        }
 
-            // Find the SpatieTranslatablePlugin
-            $plugins = $panel->getPlugins();
+        // Get locales from model if it has a method to define them
+        if (method_exists($modelClass, 'getTranslatableLocales')) {
+            return $modelClass::getTranslatableLocales();
+        }
 
-            foreach ($plugins as $plugin) {
-                if ($plugin instanceof SpatieTranslatablePlugin) {
-                    $locales = $plugin->getDefaultLocales();
+        // Use application available locales
+        return $this->getAvailableLocales();
+    }
 
-                    if (is_array($locales) && ! empty($locales)) {
-                        return $locales;
-                    }
-                }
-            }
-        } catch (\Exception $e) {
-            // Silently fail and try next source
+    /**
+     * Get translatable attributes for a model.
+     */
+    public function getTranslatableAttributes(string|Model $model): array
+    {
+        $modelClass = is_string($model) ? $model : get_class($model);
+
+        if (! $this->isTranslatable($modelClass)) {
+            return [];
+        }
+
+        $instance = is_string($model) ? new $modelClass : $model;
+
+        if (property_exists($instance, 'translatable')) {
+            return $instance->translatable;
         }
 
         return [];
     }
 
     /**
-     * Get locales from application configuration.
+     * Check if a model is translatable.
      */
-    private function getLocalesFromAppConfig(): array
+    public function isTranslatable(string|Model $model): bool
     {
-        // Try configured keys from translatable-select config
-        $configKeys = config('translatable-select.config_keys', [
-            'app.supported_locales',
-            'app.locales',
-            'translatable.locales',
-            'filament-spatie-translatable.default_locales',
-        ]);
+        $modelClass = is_string($model) ? $model : get_class($model);
 
-        foreach ($configKeys as $key) {
-            $locales = config($key);
+        return in_array(HasTranslations::class, class_uses_recursive($modelClass));
+    }
 
-            if (is_array($locales) && ! empty($locales)) {
-                return $locales;
+    /**
+     * Get the best available locale for displaying a value.
+     * 
+     * Priority: current locale -> fallback locale -> first available translation
+     */
+    public function getBestLocaleForDisplay(array $translations, ?string $preferredLocale = null): ?string
+    {
+        $preferredLocale = $preferredLocale ?? $this->getCurrentLocale();
+
+        // Check preferred locale first
+        if (isset($translations[$preferredLocale]) && ! empty($translations[$preferredLocale])) {
+            return $preferredLocale;
+        }
+
+        // Check fallback locale
+        $fallbackLocale = $this->getFallbackLocale();
+        if (isset($translations[$fallbackLocale]) && ! empty($translations[$fallbackLocale])) {
+            return $fallbackLocale;
+        }
+
+        // Return first available translation
+        foreach ($translations as $locale => $value) {
+            if (! empty($value)) {
+                return $locale;
             }
         }
 
-        // If no array configuration found, build from app.locale
-        $appLocale = config('app.locale', 'en');
-        $fallbackLocale = config('app.fallback_locale', 'en');
+        return null;
+    }
 
-        $locales = [$appLocale];
-
-        if ($fallbackLocale !== $appLocale) {
-            $locales[] = $fallbackLocale;
+    /**
+     * Resolve search locales based on configuration and model.
+     */
+    public function resolveSearchLocales(string|Model $model, ?array $customLocales = null): array
+    {
+        if ($customLocales !== null) {
+            return $customLocales;
         }
 
-        return array_unique($locales);
+        return $this->getModelLocales($model);
     }
 }

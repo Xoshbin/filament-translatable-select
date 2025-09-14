@@ -1,195 +1,202 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Xoshbin\TranslatableSelect\Services;
 
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
-use Spatie\Translatable\HasTranslations;
+use Illuminate\Support\Collection as SupportCollection;
+use Illuminate\Support\Facades\DB;
 
 /**
- * Service for handling translatable search functionality.
- *
- * This service provides the core business logic for searching across
- * translatable fields in models that use Spatie Laravel Translatable.
+ * Service for handling cross-locale search functionality.
  */
 class TranslatableSearchService
 {
     public function __construct(
-        private LocaleResolver $localeResolver
+        protected LocaleResolver $localeResolver
     ) {}
 
     /**
-     * Search for models across all translation locales.
+     * Search across multiple locales for translatable models.
      */
-    public function search(
+    public function searchAcrossLocales(
         string $modelClass,
         string $search,
-        array $options = []
+        array $searchFields,
+        array $searchLocales,
+        ?callable $queryModifier = null,
+        int $limit = 50
     ): Collection {
-        if (empty($search)) {
-            return new Collection;
+        $query = $modelClass::query();
+
+        // Apply custom query modifications first
+        if ($queryModifier) {
+            $query = $queryModifier($query);
         }
 
-        $query = $this->buildSearchQuery($modelClass, $search, $options);
-
-        $limit = $options['limit'] ?? config('translatable-select.default_limit', 50);
+        // Build cross-locale search conditions
+        $this->addCrossLocaleSearchConditions($query, $search, $searchFields, $searchLocales);
 
         return $query->limit($limit)->get();
     }
 
     /**
-     * Get search results formatted for Filament select components.
+     * Add cross-locale search conditions to a query.
+     */
+    protected function addCrossLocaleSearchConditions(
+        Builder $query,
+        string $search,
+        array $searchFields,
+        array $searchLocales
+    ): void {
+        $query->where(function (Builder $subQuery) use ($search, $searchFields, $searchLocales) {
+            foreach ($searchFields as $field) {
+                foreach ($searchLocales as $locale) {
+                    $this->addLocaleFieldCondition($subQuery, $field, $locale, $search);
+                }
+            }
+        });
+    }
+
+    /**
+     * Add a search condition for a specific field and locale.
+     */
+    protected function addLocaleFieldCondition(
+        Builder $query,
+        string $field,
+        string $locale,
+        string $search
+    ): void {
+        $connection = $query->getConnection();
+        $driver = $connection->getDriverName();
+
+        if ($driver === 'mysql') {
+            $query->orWhereRaw(
+                "JSON_UNQUOTE(JSON_EXTRACT({$field}, ?)) LIKE ?",
+                ["$.{$locale}", "%{$search}%"]
+            );
+        } elseif ($driver === 'pgsql') {
+            $query->orWhereRaw(
+                "({$field}->?)::text ILIKE ?",
+                [$locale, "%{$search}%"]
+            );
+        } else {
+            // Fallback for other databases - cast to text and search
+            $query->orWhereRaw(
+                "CAST({$field} AS TEXT) LIKE ?",
+                ["%{$search}%"]
+            );
+        }
+    }
+
+    /**
+     * Get the translated label for a model field.
+     */
+    public function getTranslatedLabel(Model $model, string $field, ?string $preferredLocale = null): string
+    {
+        if (! $this->localeResolver->isTranslatable($model)) {
+            return (string) $model->getAttribute($field);
+        }
+
+        $translations = $model->getTranslations($field);
+
+        if (empty($translations)) {
+            return (string) $model->getAttribute($field);
+        }
+
+        $bestLocale = $this->localeResolver->getBestLocaleForDisplay($translations, $preferredLocale);
+
+        if ($bestLocale && isset($translations[$bestLocale])) {
+            return (string) $translations[$bestLocale];
+        }
+
+        return (string) $model->getAttribute($field);
+    }
+
+    /**
+     * Get search results formatted for Filament Select component.
      */
     public function getFilamentSearchResults(
         string $modelClass,
         string $search,
         array $options = []
     ): array {
-        $results = $this->search($modelClass, $search, $options);
+        $searchFields = $options['searchFields'] ?? $this->getDefaultSearchFields($modelClass);
+        $labelField = $options['labelField'] ?? 'name';
+        $searchLocales = $options['searchLocales'] ?? $this->localeResolver->getModelLocales($modelClass);
+        $queryModifier = $options['queryModifier'] ?? null;
+        $limit = $options['limit'] ?? 50;
 
-        $labelField = $options['labelField'] ?? config('translatable-select.component_defaults.label_field', 'name');
-        $formatter = $options['formatter'] ?? null;
+        $results = $this->searchAcrossLocales(
+            $modelClass,
+            $search,
+            $searchFields,
+            $searchLocales,
+            $queryModifier,
+            $limit
+        );
 
-        return $results->mapWithKeys(function ($model) use ($labelField, $formatter) {
-            if ($formatter && is_callable($formatter)) {
-                $formatted = $formatter($model);
-
-                return is_array($formatted) ? $formatted : [$model->id => $formatted];
-            }
-
+        return $results->mapWithKeys(function (Model $model) use ($labelField, $options) {
             $label = $this->getTranslatedLabel($model, $labelField);
 
-            return [$model->id => $label];
+            // Apply custom formatter if provided
+            if (isset($options['formatter']) && is_callable($options['formatter'])) {
+                $formatted = ($options['formatter'])($model);
+                if (is_array($formatted)) {
+                    return $formatted;
+                }
+                $label = $formatted;
+            }
+
+            return [$model->getKey() => $label];
         })->toArray();
     }
 
     /**
-     * Get the translated label for a field in the current locale.
+     * Get default search fields for a model.
      */
-    public function getTranslatedLabel(Model $model, string $field, ?string $locale = null): string
+    protected function getDefaultSearchFields(string $modelClass): array
     {
-        $locale = $locale ?? $this->localeResolver->getCurrentLocale();
+        $translatableFields = $this->localeResolver->getTranslatableAttributes($modelClass);
 
-        // Check if the field is translatable and the model has the HasTranslations trait
-        if ($this->isFieldTranslatable($model, $field) && $this->hasTranslationsSupport($model)) {
-            $translation = $model->getTranslation($field, $locale);
-
-            return $translation ?: ($model->$field ?? '');
+        if (! empty($translatableFields)) {
+            return $translatableFields;
         }
 
-        // Return the field value directly for non-translatable fields
-        return $model->$field ?? '';
+        // Fallback to common field names
+        return ['name'];
     }
 
     /**
-     * Get the translatable fields for a model.
+     * Get multiple translated labels efficiently.
      */
-    public function getTranslatableFields(string $modelClass): array
+    public function getTranslatedLabels(Collection|SupportCollection $models, string $field, ?string $preferredLocale = null): array
     {
-        $model = new $modelClass;
-
-        if (! $this->hasTranslationsSupport($model)) {
-            return [];
-        }
-
-        return $model->translatable ?? [];
+        return $models->mapWithKeys(function (Model $model) use ($field, $preferredLocale) {
+            return [$model->getKey() => $this->getTranslatedLabel($model, $field, $preferredLocale)];
+        })->toArray();
     }
 
     /**
-     * Get the searchable translatable fields for a model.
+     * Preload translatable options for a model.
      */
-    public function getSearchableTranslatableFields(string $modelClass): array
-    {
-        $model = new $modelClass;
-
-        // Check if model has custom method for searchable fields
-        if (method_exists($model, 'getTranslatableSearchFields')) {
-            return $model->getTranslatableSearchFields();
-        }
-
-        // Fallback to all translatable fields
-        return $this->getTranslatableFields($modelClass);
-    }
-
-    /**
-     * Get the searchable non-translatable fields for a model.
-     */
-    public function getSearchableNonTranslatableFields(string $modelClass): array
-    {
-        $model = new $modelClass;
-
-        // Check if model has custom method for non-translatable searchable fields
-        if (method_exists($model, 'getNonTranslatableSearchFields')) {
-            return $model->getNonTranslatableSearchFields();
-        }
-
-        return [];
-    }
-
-    /**
-     * Build the search query for a model.
-     */
-    private function buildSearchQuery(string $modelClass, string $search, array $options): Builder
-    {
+    public function preloadOptions(
+        string $modelClass,
+        string $labelField,
+        ?callable $queryModifier = null,
+        int $limit = 50
+    ): array {
         $query = $modelClass::query();
 
-        $translatableFields = $options['searchFields'] ?? $this->getSearchableTranslatableFields($modelClass);
-        $nonTranslatableFields = $this->getSearchableNonTranslatableFields($modelClass);
-        $locales = $this->localeResolver->getAvailableLocales();
+        if ($queryModifier) {
+            $query = $queryModifier($query);
+        }
 
-        return $query->where(function (Builder $subQuery) use ($search, $translatableFields, $nonTranslatableFields, $locales) {
-            // Search in translatable fields across all locales
-            if (! empty($translatableFields)) {
-                foreach ($translatableFields as $field) {
-                    foreach ($locales as $locale) {
-                        $this->addTranslatableFieldCondition($subQuery, $field, $locale, $search);
-                    }
-                }
-            }
+        $models = $query->limit($limit)->get();
 
-            // Search in non-translatable fields
-            foreach ($nonTranslatableFields as $field) {
-                $subQuery->orWhere($field, 'LIKE', '%' . $search . '%');
-            }
-        });
-    }
-
-    /**
-     * Add a translatable field search condition to the query.
-     */
-    private function addTranslatableFieldCondition(Builder $query, string $field, string $locale, string $search): void
-    {
-        $dbDriver = config('database.default');
-        $jsonExtractions = config('translatable-select.database.json_extraction', []);
-
-        // Get the appropriate JSON extraction pattern
-        $pattern = $jsonExtractions[$dbDriver] ?? $jsonExtractions['mysql'] ?? 'LOWER(JSON_UNQUOTE(JSON_EXTRACT(`{field}`, "$.{locale}"))) LIKE ?';
-
-        // Replace placeholders
-        $sql = str_replace(['{field}', '{locale}'], [$field, $locale], $pattern);
-
-        // Prepare search term
-        $searchTerm = config('translatable-select.database.case_insensitive', true)
-            ? '%' . strtolower($search) . '%'
-            : '%' . $search . '%';
-
-        $query->orWhereRaw($sql, [$searchTerm]);
-    }
-
-    /**
-     * Check if a field is translatable for a model.
-     */
-    private function isFieldTranslatable(Model $model, string $field): bool
-    {
-        return in_array($field, $model->translatable ?? [], true);
-    }
-
-    /**
-     * Check if the model has translation support.
-     */
-    private function hasTranslationsSupport(Model $model): bool
-    {
-        return in_array(HasTranslations::class, class_uses_recursive($model), true);
+        return $this->getTranslatedLabels($models, $labelField);
     }
 }
