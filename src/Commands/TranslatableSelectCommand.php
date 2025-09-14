@@ -1,12 +1,12 @@
 <?php
 
-namespace VendorName\Skeleton\Commands;
+namespace Xoshbin\TranslatableSelect\Commands;
 
 use Illuminate\Console\Command;
 
-class SkeletonCommand extends Command
+class TranslatableSelectCommand extends Command
 {
-    public $signature = 'skeleton';
+    public $signature = 'translatable-select';
 
     public $description = 'My command';
 
