@@ -4,14 +4,12 @@ declare(strict_types=1);
 
 namespace Xoshbin\TranslatableSelect\Tests\Integration;
 
-use Filament\Forms\Form as FilamentForm;
 use Illuminate\Support\Facades\App;
 use Livewire\Component;
 use Xoshbin\TranslatableSelect\Components\TranslatableSelect;
 use Xoshbin\TranslatableSelect\Tests\Database\Factories\CategoryFactory;
 use Xoshbin\TranslatableSelect\Tests\Database\Factories\ProductFactory;
 use Xoshbin\TranslatableSelect\Tests\Models\Category;
-use Xoshbin\TranslatableSelect\Tests\Models\Product;
 use Xoshbin\TranslatableSelect\Tests\TestCase;
 
 class FilamentIntegrationTest extends TestCase

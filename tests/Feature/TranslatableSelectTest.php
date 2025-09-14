@@ -9,7 +9,6 @@ use Xoshbin\TranslatableSelect\Components\TranslatableSelect;
 use Xoshbin\TranslatableSelect\Tests\Database\Factories\CategoryFactory;
 use Xoshbin\TranslatableSelect\Tests\Database\Factories\ProductFactory;
 use Xoshbin\TranslatableSelect\Tests\Models\Category;
-use Xoshbin\TranslatableSelect\Tests\Models\Product;
 use Xoshbin\TranslatableSelect\Tests\TestCase;
 
 class TranslatableSelectTest extends TestCase
@@ -200,7 +199,7 @@ class TranslatableSelectTest extends TestCase
         ])->inactive()->create();
 
         $select = TranslatableSelect::forModel('category_id', Category::class, 'name')
-            ->modifyQueryUsing(fn($query) => $query->where('active', true));
+            ->modifyQueryUsing(fn ($query) => $query->where('active', true));
 
         $searchFunction = $select->getSearchResultsClosure();
         $searchResults = $searchFunction('Technology');

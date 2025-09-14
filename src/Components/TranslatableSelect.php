@@ -7,12 +7,8 @@ namespace Xoshbin\TranslatableSelect\Components;
 use Closure;
 use Filament\Forms\Components\Select;
 use Illuminate\Contracts\Support\Htmlable;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\Relation;
-use InvalidArgumentException;
 use Xoshbin\TranslatableSelect\Services\LocaleResolver;
 use Xoshbin\TranslatableSelect\Services\TranslatableSearchService;
 
@@ -26,19 +22,25 @@ use Xoshbin\TranslatableSelect\Services\TranslatableSearchService;
 class TranslatableSelect extends Select
 {
     protected ?string $relationshipName = null;
-    protected string|Closure|null $relationshipTitleAttribute = null;
+
+    protected string | Closure | null $relationshipTitleAttribute = null;
+
     protected ?string $modelClass = null;
+
     protected array $searchableFields = [];
+
     protected ?array $searchLocales = null;
+
     protected ?string $fallbackLocale = null;
+
     protected ?Closure $queryModifier = null;
 
     /**
      * Create a translatable select for an Eloquent relationship.
      */
     public function relationship(
-        Closure|string|null $name = null,
-        Closure|string|null $titleAttribute = null,
+        Closure | string | null $name = null,
+        Closure | string | null $titleAttribute = null,
         ?Closure $modifyQueryUsing = null,
         bool $ignoreRecord = false
     ): static {
@@ -336,7 +338,7 @@ class TranslatableSelect extends Select
     /**
      * Enable preloading with translatable support.
      */
-    public function preload(bool|Closure $condition = true): static
+    public function preload(bool | Closure $condition = true): static
     {
         parent::preload($condition);
 
@@ -346,7 +348,7 @@ class TranslatableSelect extends Select
     /**
      * Enable multiple selection with translatable support.
      */
-    public function multiple(bool|Closure $condition = true): static
+    public function multiple(bool | Closure $condition = true): static
     {
         parent::multiple($condition);
 
@@ -356,7 +358,7 @@ class TranslatableSelect extends Select
     /**
      * Enable searchable functionality (always enabled for translatable selects).
      */
-    public function searchable(bool|array|Closure $condition = true): static
+    public function searchable(bool | array | Closure $condition = true): static
     {
         parent::searchable($condition);
 
@@ -366,7 +368,7 @@ class TranslatableSelect extends Select
     /**
      * Set custom search debounce for better performance.
      */
-    public function searchDebounce(int|Closure $debounce): static
+    public function searchDebounce(int | Closure $debounce): static
     {
         parent::searchDebounce($debounce);
 
@@ -376,7 +378,7 @@ class TranslatableSelect extends Select
     /**
      * Set the search prompt message.
      */
-    public function searchPrompt(Htmlable|string|Closure|null $message): static
+    public function searchPrompt(Htmlable | string | Closure | null $message): static
     {
         parent::searchPrompt($message);
 
@@ -386,7 +388,7 @@ class TranslatableSelect extends Select
     /**
      * Set the searching message.
      */
-    public function searchingMessage(Htmlable|string|Closure|null $message): static
+    public function searchingMessage(Htmlable | string | Closure | null $message): static
     {
         parent::searchingMessage($message);
 
@@ -396,7 +398,7 @@ class TranslatableSelect extends Select
     /**
      * Set the no search results message.
      */
-    public function noSearchResultsMessage(Htmlable|string|Closure|null $message): static
+    public function noSearchResultsMessage(Htmlable | string | Closure | null $message): static
     {
         parent::noSearchResultsMessage($message);
 

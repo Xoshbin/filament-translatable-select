@@ -37,13 +37,13 @@ class LocaleResolver
     {
         // Try to get from config first
         $locales = Config::get('translatable-select.available_locales');
-        
+
         if (! empty($locales)) {
             return $locales;
         }
 
         // Fallback to common configuration locations
-        $locales = Config::get('translatable.locales') 
+        $locales = Config::get('translatable.locales')
             ?? Config::get('app.available_locales')
             ?? [$this->getCurrentLocale(), $this->getFallbackLocale()];
 
@@ -53,7 +53,7 @@ class LocaleResolver
     /**
      * Get translatable locales for a specific model.
      */
-    public function getModelLocales(string|Model $model): array
+    public function getModelLocales(string | Model $model): array
     {
         $modelClass = is_string($model) ? $model : get_class($model);
 
@@ -73,7 +73,7 @@ class LocaleResolver
     /**
      * Get translatable attributes for a model.
      */
-    public function getTranslatableAttributes(string|Model $model): array
+    public function getTranslatableAttributes(string | Model $model): array
     {
         $modelClass = is_string($model) ? $model : get_class($model);
 
@@ -93,7 +93,7 @@ class LocaleResolver
     /**
      * Check if a model is translatable.
      */
-    public function isTranslatable(string|Model $model): bool
+    public function isTranslatable(string | Model $model): bool
     {
         $modelClass = is_string($model) ? $model : get_class($model);
 
@@ -102,7 +102,7 @@ class LocaleResolver
 
     /**
      * Get the best available locale for displaying a value.
-     * 
+     *
      * Priority: current locale -> fallback locale -> first available translation
      */
     public function getBestLocaleForDisplay(array $translations, ?string $preferredLocale = null): ?string
@@ -133,7 +133,7 @@ class LocaleResolver
     /**
      * Resolve search locales based on configuration and model.
      */
-    public function resolveSearchLocales(string|Model $model, ?array $customLocales = null): array
+    public function resolveSearchLocales(string | Model $model, ?array $customLocales = null): array
     {
         if ($customLocales !== null) {
             return $customLocales;
