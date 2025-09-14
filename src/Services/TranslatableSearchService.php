@@ -52,19 +52,31 @@ class TranslatableSearchService
         array $searchFields,
         array $searchLocales
     ): void {
-        $query->where(function (Builder $subQuery) use ($search, $searchFields, $searchLocales) {
+        $modelClass = $query->getModel();
+        $translatableFields = $this->localeResolver->getTranslatableAttributes($modelClass);
+        $nonTranslatableFields = method_exists($modelClass, 'getNonTranslatableSearchFields')
+            ? $modelClass->getNonTranslatableSearchFields()
+            : [];
+
+        $query->where(function (Builder $subQuery) use ($search, $searchFields, $searchLocales, $translatableFields, $nonTranslatableFields) {
             foreach ($searchFields as $field) {
-                foreach ($searchLocales as $locale) {
-                    $this->addLocaleFieldCondition($subQuery, $field, $locale, $search);
+                if (in_array($field, $translatableFields)) {
+                    // Handle translatable fields - search across all locales
+                    foreach ($searchLocales as $locale) {
+                        $this->addTranslatableFieldCondition($subQuery, $field, $locale, $search);
+                    }
+                } elseif (in_array($field, $nonTranslatableFields) || !in_array($field, $translatableFields)) {
+                    // Handle non-translatable fields - simple LIKE search
+                    $this->addNonTranslatableFieldCondition($subQuery, $field, $search);
                 }
             }
         });
     }
 
     /**
-     * Add a search condition for a specific field and locale.
+     * Add a search condition for a translatable field and locale.
      */
-    protected function addLocaleFieldCondition(
+    protected function addTranslatableFieldCondition(
         Builder $query,
         string $field,
         string $locale,
@@ -90,6 +102,17 @@ class TranslatableSearchService
                 ["%{$search}%"]
             );
         }
+    }
+
+    /**
+     * Add a search condition for a non-translatable field.
+     */
+    protected function addNonTranslatableFieldCondition(
+        Builder $query,
+        string $field,
+        string $search
+    ): void {
+        $query->orWhere($field, 'LIKE', "%{$search}%");
     }
 
     /**
