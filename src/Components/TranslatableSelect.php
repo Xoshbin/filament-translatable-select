@@ -44,16 +44,17 @@ class TranslatableSelect extends Select
         ?Closure $modifyQueryUsing = null,
         bool $ignoreRecord = false
     ): static {
-        // Call parent first to set up the basic relationship
-        parent::relationship($name, $titleAttribute, $modifyQueryUsing, $ignoreRecord);
-
-        // Store our custom properties
+        // Store our custom properties first
         $this->relationshipName = $name;
         $this->relationshipTitleAttribute = $titleAttribute ?? 'name';
 
         if ($modifyQueryUsing) {
             $this->queryModifier = $modifyQueryUsing;
         }
+
+        // Call parent to set up the basic relationship, but pass null for modifyQueryUsing
+        // to avoid conflicts with our custom search functionality
+        parent::relationship($name, $titleAttribute, null, $ignoreRecord);
 
         $this->configureForRelationship();
 
@@ -134,10 +135,6 @@ class TranslatableSelect extends Select
     {
         $modelClass = $this->getRelatedModelClass();
 
-        if (! $modelClass) {
-            return [];
-        }
-
         $searchService = app(TranslatableSearchService::class);
         $localeResolver = app(LocaleResolver::class);
 
@@ -151,13 +148,15 @@ class TranslatableSelect extends Select
 
         $searchLocales = $this->searchLocales ?? $localeResolver->getModelLocales($modelClass);
 
-        return $searchService->getFilamentSearchResults($modelClass, $search, [
+        $results = $searchService->getFilamentSearchResults($modelClass, $search, [
             'searchFields' => $searchFields,
             'labelField' => $this->relationshipTitleAttribute ?? 'name',
             'searchLocales' => $searchLocales,
             'queryModifier' => $this->queryModifier,
             'limit' => 50,
         ]);
+
+        return $results;
     }
 
     /**
@@ -262,6 +261,23 @@ class TranslatableSelect extends Select
             }
         }
 
+        // If we still don't have a record (e.g., in create forms), create a new instance
+        if (! $record instanceof Model) {
+            $livewire = $this->getLivewire();
+
+            // Try to get model class from Livewire component
+            if (method_exists($livewire, 'getModel')) {
+                $modelClass = $livewire->getModel();
+                $record = new $modelClass();
+            } elseif (property_exists($livewire, 'model')) {
+                $modelClass = $livewire->model;
+                $record = new $modelClass();
+            } else {
+                // Last resort: try to infer from the component name or context
+                $record = $this->inferModelFromContext();
+            }
+        }
+
         if (! $record instanceof Model) {
             return null;
         }
@@ -275,6 +291,37 @@ class TranslatableSelect extends Select
         $this->modelClass = get_class($relationship->getRelated());
 
         return $this->modelClass;
+    }
+
+    /**
+     * Infer the model class from the component context.
+     */
+    protected function inferModelFromContext(): ?Model
+    {
+        $livewire = $this->getLivewire();
+
+        // Check if it's a Filament resource page
+        if (method_exists($livewire, 'getResource')) {
+            $resource = $livewire->getResource();
+            if (method_exists($resource, 'getModel')) {
+                $modelClass = $resource::getModel();
+                return new $modelClass();
+            }
+        }
+
+        // Check for common Filament patterns
+        $livewireClass = get_class($livewire);
+
+        if (preg_match('/\\\\Resources\\\\(.+)Resource\\\\/', $livewireClass, $matches)) {
+            $modelName = $matches[1];
+            $modelClass = "App\\Models\\{$modelName}";
+
+            if (class_exists($modelClass)) {
+                return new $modelClass();
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -361,6 +408,13 @@ class TranslatableSelect extends Select
     public function searchable(bool | array | Closure $condition = true): static
     {
         parent::searchable($condition);
+
+        // Re-configure our custom search functionality after parent searchable is called
+        if ($this->relationshipName) {
+            $this->configureForRelationship();
+        } else {
+            $this->configureForModel();
+        }
 
         return $this;
     }

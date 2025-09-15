@@ -86,7 +86,7 @@ class TranslatableSearchService
 
         if ($driver === 'mysql') {
             $query->orWhereRaw(
-                "JSON_UNQUOTE(JSON_EXTRACT({$field}, ?)) LIKE ?",
+                "LOWER(JSON_UNQUOTE(JSON_EXTRACT({$field}, ?))) LIKE LOWER(?)",
                 ["$.{$locale}", "%{$search}%"]
             );
         } elseif ($driver === 'pgsql') {
@@ -111,7 +111,17 @@ class TranslatableSearchService
         string $field,
         string $search
     ): void {
-        $query->orWhere($field, 'LIKE', "%{$search}%");
+        $connection = $query->getConnection();
+        $driver = $connection->getDriverName();
+
+        if ($driver === 'mysql') {
+            $query->orWhereRaw("LOWER({$field}) LIKE LOWER(?)", ["%{$search}%"]);
+        } elseif ($driver === 'pgsql') {
+            $query->orWhere($field, 'ILIKE', "%{$search}%");
+        } else {
+            // Fallback for other databases
+            $query->orWhere($field, 'LIKE', "%{$search}%");
+        }
     }
 
     /**
