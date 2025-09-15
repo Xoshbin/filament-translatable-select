@@ -17,6 +17,8 @@ A powerful Filament v4 Select component that **fully extends** Filament's native
 - **🏗️ Clean Architecture**: Separation of concerns with dedicated services
 - **📦 Zero Breaking Changes**: Drop-in replacement for standard Filament Select
 - **🌐 Database Agnostic**: Optimized for MySQL, PostgreSQL, and SQLite
+- **🔤 Case-Insensitive Search**: Automatic case-insensitive search across all database engines
+- **🏢 Multi-Tenancy Ready**: Seamless integration with Laravel Filament's tenancy system
 
 ## 📋 Requirements
 
@@ -177,6 +179,81 @@ TranslatableSelect::forModel('product_id', Product::class, 'name')
     ->searchDebounce(300)  // Delay search by 300ms
 ```
 
+## 🔄 Migration from Standard Filament Select
+
+### Simple Drop-in Replacement
+
+TranslatableSelect is designed as a complete drop-in replacement for Filament's native Select component:
+
+```php
+// Before: Standard Filament Select
+Select::make('category_id')
+    ->relationship('category', 'name')
+    ->searchable()
+    ->preload()
+
+// After: TranslatableSelect with cross-locale search
+TranslatableSelect::make('category_id')
+    ->relationship('category', 'name')
+    ->searchableFields(['name']) // Now searches across all locales!
+    ->preload()
+```
+
+### Enhanced Features
+
+Add powerful search capabilities to existing selects:
+
+```php
+// Standard select with limited search
+Select::make('product_id')
+    ->relationship('product', 'name')
+    ->searchable()
+
+// Enhanced with cross-locale search and multiple fields
+TranslatableSelect::make('product_id')
+    ->relationship('product', 'name')
+    ->searchableFields(['name', 'sku', 'description']) // Search multiple fields
+    ->searchLocales(['en', 'ar', 'ku']) // Across multiple locales
+    ->searchDebounce(300) // Performance optimization
+```
+
+### Migration Checklist
+
+1. **Replace Import Statement**:
+   ```php
+   // Old
+   use Filament\Forms\Components\Select;
+
+   // New
+   use Xoshbin\TranslatableSelect\Components\TranslatableSelect;
+   ```
+
+2. **Update Component Usage**:
+   ```php
+   // Old
+   Select::make('field_name')
+
+   // New
+   TranslatableSelect::make('field_name')
+   ```
+
+3. **Add Search Configuration**:
+   ```php
+   // Add these methods for enhanced functionality
+   ->searchableFields(['name', 'code'])
+   ->searchLocales(['en', 'ar', 'ku']) // Optional: specify locales
+   ```
+
+4. **Review Query Modifiers** (Important for Multi-Tenant Apps):
+   ```php
+   // Remove manual tenant filtering - let Filament handle it
+   // Old (problematic)
+   ->modifyQueryUsing(fn($query) => $query->where('company_id', $tenant->id))
+
+   // New (correct)
+   ->modifyQueryUsing(fn($query) => $query->where('active', true))
+   ```
+
 ## 🏗️ Model Setup
 
 ### Basic Model Configuration
@@ -285,12 +362,92 @@ return [
     'database' => [
         'case_insensitive_search' => true,
         'json_extraction_patterns' => [
-            'mysql' => 'LOWER(JSON_UNQUOTE(JSON_EXTRACT(`{field}`, "$.{locale}"))) LIKE ?',
-            'pgsql' => 'LOWER(({field}->>\'{locale}\')) LIKE ?',
-            'sqlite' => 'LOWER(json_extract(`{field}`, "$.{locale}")) LIKE ?',
+            'mysql' => 'LOWER(JSON_UNQUOTE(JSON_EXTRACT(`{field}`, "$.{locale}"))) LIKE LOWER(?)',
+            'pgsql' => 'LOWER(({field}->>\'{locale}\')) ILIKE ?',
+            'sqlite' => 'LOWER(json_extract(`{field}`, "$.{locale}")) LIKE LOWER(?)',
         ],
     ],
 ];
+```
+
+## 🏢 Multi-Tenancy Considerations
+
+### Overview
+
+TranslatableSelect seamlessly integrates with Laravel Filament's tenancy system. The component automatically respects tenant scoping when used in tenant-aware resources, but there are important considerations to ensure optimal performance and avoid conflicts.
+
+### ⚠️ Important: Avoid Duplicate Company/Tenant Filtering
+
+**❌ INCORRECT - Causes Search Conflicts:**
+```php
+// DON'T DO THIS - Manual tenant filtering conflicts with Filament's automatic tenancy
+TranslatableSelect::forModel('account_id', Account::class, 'name')
+    ->modifyQueryUsing(fn($query) => $query->where('company_id', Filament::getTenant()->id))
+    ->searchableFields(['name', 'code'])
+```
+
+**✅ CORRECT - Let Filament Handle Tenancy:**
+```php
+// DO THIS - Filament automatically applies tenant scoping
+TranslatableSelect::forModel('account_id', Account::class, 'name')
+    ->searchableFields(['name', 'code'])
+    ->modifyQueryUsing(fn($query) => $query->where('active', true)) // Only add business logic filters
+```
+
+### Best Practices for Multi-Tenant Applications
+
+#### **1. Trust Filament's Automatic Tenancy**
+```php
+// Filament automatically adds tenant scoping - no manual filtering needed
+TranslatableSelect::make('category_id')
+    ->relationship('category', 'name')
+    ->searchableFields(['name', 'description'])
+    ->modifyQueryUsing(fn($query) => $query->where('active', true)) // Business logic only
+```
+
+#### **2. Use Query Modifiers for Business Logic Only**
+```php
+// Focus on business rules, not tenant filtering
+TranslatableSelect::forModel('product_id', Product::class, 'name')
+    ->searchableFields(['name', 'sku'])
+    ->modifyQueryUsing(function($query) {
+        return $query->where('active', true)
+                    ->where('stock_quantity', '>', 0)
+                    ->orderBy('name');
+    })
+```
+
+#### **3. Relationship-Based Tenant Scoping**
+```php
+// For complex tenant relationships
+TranslatableSelect::make('supplier_id')
+    ->relationship('supplier', 'name')
+    ->searchableFields(['name', 'company_name'])
+    ->modifyQueryUsing(fn($query) => $query->where('approved', true))
+```
+
+### Multi-Tenant Model Setup
+
+Ensure your models are properly configured for tenancy:
+
+```php
+use Spatie\Translatable\HasTranslations;
+use Illuminate\Database\Eloquent\Model;
+
+class Account extends Model
+{
+    use HasTranslations;
+
+    public array $translatable = ['name'];
+
+    protected $fillable = ['name', 'code', 'type', 'company_id'];
+
+    // Filament will automatically scope by company_id when using tenancy
+    public function company()
+    {
+        return $this->belongsTo(Company::class);
+    }
+}
 ```
 
 ## 🎨 Advanced Examples
@@ -309,16 +466,13 @@ TranslatableSelect::forModel('product_id', Product::class, 'name')
     ->required()
 ```
 
-### Multi-Tenant Category Selection
+### Multi-Tenant Category Selection (Correct Way)
 
 ```php
 TranslatableSelect::make('category_id')
     ->relationship('category', 'name')
     ->searchableFields(['name', 'description'])
-    ->modifyQueryUsing(function($query) {
-        return $query->where('tenant_id', Filament::getTenant()->id)
-                    ->where('active', true);
-    })
+    ->modifyQueryUsing(fn($query) => $query->where('active', true)) // No manual tenant filtering!
     ->preload()
     ->required()
 ```
@@ -334,6 +488,57 @@ TranslatableSelect::forModel('tags', Tag::class, 'name')
     ->preload()
     ->getOptionLabelUsing(fn($record) => "🏷️ {$record->name}")
     ->placeholder('Select tags...')
+```
+
+### Real-World Usage Examples
+
+#### **Accounting System - Account Selection**
+```php
+// Income accounts for product configuration
+TranslatableSelect::forModel('income_account_id', Account::class, 'name')
+    ->label('Income Account')
+    ->searchableFields(['name', 'code'])
+    ->modifyQueryUsing(fn($query) => $query->whereIn('type', [
+        AccountType::Income,
+        AccountType::OtherIncome
+    ]))
+    ->getOptionLabelUsing(fn($record) => "{$record->code} - {$record->name}")
+    ->required()
+
+// Expense accounts for product configuration
+TranslatableSelect::forModel('expense_account_id', Account::class, 'name')
+    ->label('Expense Account')
+    ->searchableFields(['name', 'code'])
+    ->modifyQueryUsing(fn($query) => $query->whereIn('type', [
+        AccountType::Expense,
+        AccountType::CostOfGoodsSold
+    ]))
+    ->getOptionLabelUsing(fn($record) => "{$record->code} - {$record->name}")
+    ->required()
+```
+
+#### **Inventory Management - Product Selection**
+```php
+TranslatableSelect::make('product_id')
+    ->relationship('product', 'name')
+    ->searchableFields(['name', 'sku', 'description'])
+    ->modifyQueryUsing(fn($query) => $query->where('active', true))
+    ->getOptionLabelUsing(fn($record) => "{$record->sku} - {$record->name}")
+    ->preload()
+    ->required()
+```
+
+#### **CRM System - Customer Selection**
+```php
+TranslatableSelect::forModel('customer_id', Customer::class, 'name')
+    ->label('Customer')
+    ->searchableFields(['name', 'company_name', 'email'])
+    ->modifyQueryUsing(fn($query) => $query->where('active', true))
+    ->getOptionLabelUsing(fn($record) => $record->company_name
+        ? "{$record->name} ({$record->company_name})"
+        : $record->name)
+    ->searchDebounce(300)
+    ->required()
 ```
 
 ## 🔍 How It Works
@@ -357,15 +562,25 @@ The package consists of three main components:
 
 3. **Query Construction**: Builds efficient database queries using JSON extraction:
    ```sql
-   -- Example MySQL query for searching "tech" across locales
+   -- Example MySQL query for searching "tech" across locales (case-insensitive)
    SELECT * FROM categories
-   WHERE LOWER(JSON_UNQUOTE(JSON_EXTRACT(`name`, "$.en"))) LIKE '%tech%'
-      OR LOWER(JSON_UNQUOTE(JSON_EXTRACT(`name`, "$.ar"))) LIKE '%tech%'
-      OR LOWER(JSON_UNQUOTE(JSON_EXTRACT(`name`, "$.ku"))) LIKE '%tech%'
+   WHERE LOWER(JSON_UNQUOTE(JSON_EXTRACT(`name`, "$.en"))) LIKE LOWER('%tech%')
+      OR LOWER(JSON_UNQUOTE(JSON_EXTRACT(`name`, "$.ar"))) LIKE LOWER('%tech%')
+      OR LOWER(JSON_UNQUOTE(JSON_EXTRACT(`name`, "$.ku"))) LIKE LOWER('%tech%')
    LIMIT 50
    ```
 
 4. **Result Processing**: Formats results using current locale with fallback support
+
+### Case-Insensitive Search
+
+The component automatically performs case-insensitive searches across all supported database engines:
+
+- **MySQL**: Uses `LOWER()` functions for both JSON fields and search terms
+- **PostgreSQL**: Uses `ILIKE` operator for case-insensitive pattern matching
+- **SQLite**: Uses `LOWER()` functions similar to MySQL
+
+This means searching for "product", "Product", or "PRODUCT" will all return the same results.
 
 ### Performance Optimizations
 
@@ -386,7 +601,32 @@ php artisan config:clear
 php artisan package:discover
 ```
 
-**2. No search results**
+**2. "No options match your search" despite valid data**
+
+This is often caused by conflicting query modifiers in multi-tenant applications:
+
+```php
+// ❌ PROBLEM: Manual tenant filtering conflicts with Filament's automatic tenancy
+TranslatableSelect::forModel('account_id', Account::class, 'name')
+    ->modifyQueryUsing(fn($query) => $query->where('company_id', $tenant->id)) // Causes conflicts!
+
+// ✅ SOLUTION: Remove manual tenant filtering, let Filament handle it
+TranslatableSelect::forModel('account_id', Account::class, 'name')
+    ->searchableFields(['name', 'code'])
+    ->modifyQueryUsing(fn($query) => $query->where('active', true)) // Business logic only
+```
+
+**3. Case sensitivity issues**
+
+The component automatically handles case-insensitive search, but if you're experiencing issues:
+
+```php
+// Ensure you're not overriding the search behavior
+TranslatableSelect::forModel('product_id', Product::class, 'name')
+    ->searchableFields(['name']) // Let the component handle case sensitivity
+```
+
+**4. No search results**
 ```php
 // Ensure your model has the HasTranslations trait
 use Spatie\Translatable\HasTranslations;
@@ -399,19 +639,28 @@ class YourModel extends Model
 }
 ```
 
-**3. Search not working across locales**
+**5. Search not working across locales**
 ```php
 // Check if translatable fields are properly configured
 TranslatableSelect::forModel('model_id', YourModel::class, 'name')
     ->searchableFields(['name']) // Explicitly set searchable fields
+    ->searchLocales(['en', 'ar', 'ku']) // Specify locales if needed
 ```
 
-**4. Performance issues**
+**6. Performance issues**
 ```php
 // Optimize with search limits and debouncing
 TranslatableSelect::forModel('product_id', Product::class, 'name')
     ->searchDebounce(300)  // Add 300ms delay
     ->modifyQueryUsing(fn($query) => $query->limit(25))
+```
+
+**7. Relationship search not working**
+```php
+// Ensure the relationship method exists and is properly defined
+TranslatableSelect::make('category_id')
+    ->relationship('category', 'name') // 'category' method must exist on the model
+    ->searchableFields(['name'])
 ```
 
 ### Debug Helpers
@@ -423,15 +672,59 @@ dd($localeResolver->getAvailableLocales());
 
 // Test search service directly
 $searchService = app(\Xoshbin\TranslatableSelect\Services\TranslatableSearchService::class);
-dd($searchService->searchAcrossLocales(
-    Currency::class,
-    'test',
-    ['name'],
-    ['en', 'ar']
+dd($searchService->getFilamentSearchResults(
+    Account::class,
+    'product', // Search term
+    ['name', 'code'], // Search fields
+    ['en', 'ar', 'ku'], // Search locales
+    null, // Query modifier
+    50 // Limit
 ));
 
 // Check current locale
 dd(app()->getLocale());
+
+// Test model translatable configuration
+dd(Account::make()->getTranslatableAttributes());
+
+// Check if tenancy is affecting queries (in tenant-aware resources)
+dd(Filament::getTenant()?->getKey());
+```
+
+### Debugging Search Issues
+
+If search is not working, enable query logging to see what's happening:
+
+```php
+// Add this to your resource or form to debug queries
+use Illuminate\Support\Facades\DB;
+
+// Enable query logging
+DB::enableQueryLog();
+
+// Perform your search...
+
+// Check the queries
+dd(DB::getQueryLog());
+```
+
+### Common Query Conflicts
+
+**Problem**: Duplicate tenant filtering
+```sql
+-- This query shows duplicate company_id conditions
+SELECT * FROM accounts
+WHERE company_id = 1 -- Filament's automatic tenancy
+  AND company_id = 1 -- Your manual filtering (duplicate!)
+  AND (LOWER(JSON_UNQUOTE(JSON_EXTRACT(`name`, "$.en"))) LIKE LOWER('%product%'))
+```
+
+**Solution**: Remove manual tenant filtering
+```php
+// Let Filament handle tenancy automatically
+TranslatableSelect::forModel('account_id', Account::class, 'name')
+    ->searchableFields(['name', 'code'])
+    // No manual company_id filtering needed!
 ```
 
 ## 🧪 Testing
@@ -465,6 +758,26 @@ This is a **complete rewrite** of the package with:
 - ✅ **Comprehensive Tests**: 52 tests with full coverage
 - ✅ **Clean Architecture**: Separation of concerns with dedicated services
 - ✅ **Zero Breaking Changes**: Drop-in replacement for standard Select
+- ✅ **Case-Insensitive Search**: Automatic case-insensitive search across all database engines
+- ✅ **Multi-Tenancy Integration**: Seamless compatibility with Filament's tenancy system
+- ✅ **Improved Error Handling**: Better debugging and troubleshooting capabilities
+
+### Recent Improvements (Latest Release)
+
+#### 🔧 **Fixed Search Functionality Issues**
+- **Case Sensitivity**: Resolved case-sensitive search problems where "product" wouldn't match "Product Sales"
+- **Multi-Tenancy Conflicts**: Fixed conflicts between manual tenant filtering and Filament's automatic tenancy system
+- **Query Optimization**: Improved database query generation for better performance
+
+#### 🏢 **Enhanced Multi-Tenancy Support**
+- **Automatic Tenant Scoping**: Works seamlessly with Filament's tenant-aware resources
+- **Conflict Prevention**: Prevents duplicate company/tenant filtering that caused search failures
+- **Best Practices Documentation**: Comprehensive guide for multi-tenant applications
+
+#### 🔍 **Improved Search Capabilities**
+- **Cross-Locale Search**: Search "sales" and find both "Product Sales" and "Sales Discounts & Returns"
+- **Case-Insensitive**: Search "product" and match "Product Sales" regardless of case
+- **Database Agnostic**: Optimized queries for MySQL, PostgreSQL, and SQLite
 
 ## 📝 Changelog
 
