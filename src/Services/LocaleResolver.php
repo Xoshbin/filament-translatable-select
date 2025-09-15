@@ -42,12 +42,29 @@ class LocaleResolver
             return $locales;
         }
 
-        // Fallback to common configuration locations
-        $locales = Config::get('translatable.locales')
-            ?? Config::get('app.available_locales')
-            ?? [$this->getCurrentLocale(), $this->getFallbackLocale()];
+        // Check configured config keys in order
+        $configKeys = Config::get('translatable-select.config_keys', [
+            'app.supported_locales',
+            'app.locales',
+            'translatable.locales',
+            'filament-spatie-translatable.default_locales',
+        ]);
 
-        return array_unique($locales);
+        foreach ($configKeys as $key) {
+            $locales = Config::get($key);
+            if (! empty($locales) && is_array($locales)) {
+                return array_unique($locales);
+            }
+        }
+
+        // Fallback to manual locales from config
+        $manualLocales = Config::get('translatable-select.manual_locales');
+        if (! empty($manualLocales) && is_array($manualLocales)) {
+            return array_unique($manualLocales);
+        }
+
+        // Final fallback to current and fallback locale
+        return array_unique([$this->getCurrentLocale(), $this->getFallbackLocale()]);
     }
 
     /**
