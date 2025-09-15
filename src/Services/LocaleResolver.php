@@ -70,7 +70,7 @@ class LocaleResolver
     /**
      * Get translatable locales for a specific model.
      */
-    public function getModelLocales(string|Model $model): array
+    public function getModelLocales(string | Model $model): array
     {
         $modelClass = is_string($model) ? $model : get_class($model);
 
@@ -90,7 +90,7 @@ class LocaleResolver
     /**
      * Get translatable attributes for a model.
      */
-    public function getTranslatableAttributes(string|Model $model): array
+    public function getTranslatableAttributes(string | Model $model): array
     {
         $modelClass = is_string($model) ? $model : get_class($model);
 
@@ -110,7 +110,7 @@ class LocaleResolver
     /**
      * Check if a model is translatable.
      */
-    public function isTranslatable(string|Model $model): bool
+    public function isTranslatable(string | Model $model): bool
     {
         $modelClass = is_string($model) ? $model : get_class($model);
 
@@ -150,7 +150,7 @@ class LocaleResolver
     /**
      * Resolve search locales based on configuration and model.
      */
-    public function resolveSearchLocales(string|Model $model, ?array $customLocales = null): array
+    public function resolveSearchLocales(string | Model $model, ?array $customLocales = null): array
     {
         if ($customLocales !== null) {
             return $customLocales;

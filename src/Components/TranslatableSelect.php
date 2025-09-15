@@ -268,10 +268,10 @@ class TranslatableSelect extends Select
             // Try to get model class from Livewire component
             if (method_exists($livewire, 'getModel')) {
                 $modelClass = $livewire->getModel();
-                $record = new $modelClass();
+                $record = new $modelClass;
             } elseif (property_exists($livewire, 'model')) {
                 $modelClass = $livewire->model;
-                $record = new $modelClass();
+                $record = new $modelClass;
             } else {
                 // Last resort: try to infer from the component name or context
                 $record = $this->inferModelFromContext();
@@ -305,7 +305,8 @@ class TranslatableSelect extends Select
             $resource = $livewire->getResource();
             if (method_exists($resource, 'getModel')) {
                 $modelClass = $resource::getModel();
-                return new $modelClass();
+
+                return new $modelClass;
             }
         }
 
@@ -317,7 +318,7 @@ class TranslatableSelect extends Select
             $modelClass = "App\\Models\\{$modelName}";
 
             if (class_exists($modelClass)) {
-                return new $modelClass();
+                return new $modelClass;
             }
         }
 

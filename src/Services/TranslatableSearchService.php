@@ -64,7 +64,7 @@ class TranslatableSearchService
                     foreach ($searchLocales as $locale) {
                         $this->addTranslatableFieldCondition($subQuery, $field, $locale, $search);
                     }
-                } elseif (in_array($field, $nonTranslatableFields) || !in_array($field, $translatableFields)) {
+                } elseif (in_array($field, $nonTranslatableFields) || ! in_array($field, $translatableFields)) {
                     // Handle non-translatable fields - simple LIKE search
                     $this->addNonTranslatableFieldCondition($subQuery, $field, $search);
                 }
