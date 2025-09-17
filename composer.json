@@ -1,5 +1,5 @@
 {
-    "name": "xoshbin/translatable-select",
+    "name": "xoshbin/filament-translatable-select",
     "description": "A Filament Select component with built-in translatable search functionality for Laravel applications using Spatie Laravel Translatable",
     "keywords": [
         "filament",
@@ -11,10 +11,10 @@
         "multi-locale",
         "cross-locale"
     ],
-    "homepage": "https://github.com/xoshbin/translatable-select",
+    "homepage": "https://github.com/xoshbin/filament-translatable-select",
     "support": {
-        "issues": "https://github.com/xoshbin/translatable-select/issues",
-        "source": "https://github.com/xoshbin/translatable-select"
+        "issues": "https://github.com/xoshbin/filament-translatable-select/issues",
+        "source": "https://github.com/xoshbin/filament-translatable-select"
     },
     "license": "MIT",
     "authors": [
