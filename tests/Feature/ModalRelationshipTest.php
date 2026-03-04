@@ -16,15 +16,17 @@ class ModalRelationshipTest extends TestCase
     public function test_it_resolves_relationship_even_if_record_is_from_wrong_model(): void
     {
         // 1. Create a Tag (which doesn't have 'category' relationship)
-        $tag = new Tag();
+        $tag = new Tag;
 
         // 2. Create a Product (which DOES have 'category' relationship)
-        $product = new Product();
+        $product = new Product;
 
         // 3. Create a TranslatableSelect with 'category' relationship
         // We subclass it to mock the Filament container/model resolution logic
-        $select = new class('category_id') extends TranslatableSelect {
+        $select = new class('category_id') extends TranslatableSelect
+        {
             public ?Model $mockRecord = null;
+
             public ?Model $mockModelInstance = null;
 
             public function getRecord(bool $withContainerRecord = true): Model | array | null
@@ -48,7 +50,7 @@ class ModalRelationshipTest extends TestCase
 
         // Set the "wrong" record (simulating being inside a modal opened from RFQ)
         $select->mockRecord = $tag;
-        
+
         // Set the "right" model instance (simulating the schema model set by Filament in the modal)
         $select->mockModelInstance = $product;
 
@@ -60,13 +62,26 @@ class ModalRelationshipTest extends TestCase
 
     public function test_it_returns_null_if_relationship_exists_on_neither_record_nor_model_instance(): void
     {
-        $tag = new Tag();
-        
-        $select = new class('non_existent_id') extends TranslatableSelect {
+        $tag = new Tag;
+
+        $select = new class('non_existent_id') extends TranslatableSelect
+        {
             public ?Model $mockRecord = null;
-            public function getRecord(bool $withContainerRecord = true): Model | array | null { return $this->mockRecord; }
-            public function getModelInstance(): ?Model { return null; }
-            public function callGetRelatedModelClass(): ?string { return $this->getRelatedModelClass(); }
+
+            public function getRecord(bool $withContainerRecord = true): Model | array | null
+            {
+                return $this->mockRecord;
+            }
+
+            public function getModelInstance(): ?Model
+            {
+                return null;
+            }
+
+            public function callGetRelatedModelClass(): ?string
+            {
+                return $this->getRelatedModelClass();
+            }
         };
 
         $select->relationship('non_existent_relation', 'name');
