@@ -135,6 +135,10 @@ class TranslatableSelect extends Select
     {
         $modelClass = $this->getRelatedModelClass();
 
+        if (! $modelClass) {
+            return [];
+        }
+
         $searchService = app(TranslatableSearchService::class);
         $localeResolver = app(LocaleResolver::class);
 
@@ -245,7 +249,7 @@ class TranslatableSelect extends Select
         }
 
         if (! $this->relationshipName) {
-            return null;
+            return $this->getModel();
         }
 
         $record = $this->getRecord();
@@ -280,6 +284,20 @@ class TranslatableSelect extends Select
 
         if (! $record instanceof Model) {
             return null;
+        }
+
+        // Guard: the resolved record might be the wrong model (e.g. when this field
+        // is embedded inside a createOptionForm modal, the Livewire context points to
+        // the outer page's model, not the model the form is actually for).
+        if (! method_exists($record, $this->relationshipName)) {
+            // Try to resolve from the schema container chain - this works when the field
+            // is inside a createOptionForm modal that has an explicit model set.
+            $schemaRecord = $this->getModelInstance();
+            if ($schemaRecord instanceof Model && method_exists($schemaRecord, $this->relationshipName)) {
+                $record = $schemaRecord;
+            } else {
+                return null;
+            }
         }
 
         $relationship = $record->{$this->relationshipName}();

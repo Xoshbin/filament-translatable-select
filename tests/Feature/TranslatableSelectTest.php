@@ -275,4 +275,20 @@ class TranslatableSelectTest extends TestCase
 
         $this->assertNull($label);
     }
+
+    public function test_can_search_with_explicit_model_instead_of_relationship(): void
+    {
+        CategoryFactory::new()->withSpecificTranslations([
+            'en' => 'Technology',
+            'ku' => 'تەکنەلۆژیا',
+        ])->create();
+
+        $select = TranslatableSelect::make('category_id')
+            ->model(Category::class);
+
+        $searchFunction = $select->getSearchResultsClosure();
+        $results = $searchFunction('Tech');
+
+        $this->assertCount(1, $results);
+    }
 }
